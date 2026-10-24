@@ -1,0 +1,27 @@
+{
+  "run": {
+    "id": "fixture-stale",
+    "ruleId": "fixture-stale-quote",
+    "ranAt": 1792836326893,
+    "evaluated": 1,
+    "materialChanges": 0,
+    "analyzed": 0,
+    "notified": false,
+    "failures": [
+      "AAPL.US: quote stale"
+    ],
+    "outcome": "incomplete",
+    "scopeSnapshot": {
+      "kind": "rule",
+      "symbols": [
+        "AAPL.US"
+      ],
+      "capturedAt": 1792836326893
+    }
+  },
+  "notifications": 0,
+  "quiet": {
+    "count": 0,
+    "message": "No monitored securities."
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "run": {
+    "id": "fixture-recovered",
+    "ruleId": "fixture-stale-quote",
+    "ranAt": 1792836334265,
+    "evaluated": 1,
+    "materialChanges": 0,
+    "analyzed": 0,
+    "notified": true,
+    "failures": [],
+    "outcome": "no_material_update",
+    "scopeSnapshot": {
+      "kind": "rule",
+      "symbols": [
+        "AAPL.US"
+      ],
+      "capturedAt": 1792836334265
+    }
+  },
+  "notifications": 1,
+  "quiet": {
+    "count": 1,
+    "message": "1 monitored security: no material change"
+  }
+}

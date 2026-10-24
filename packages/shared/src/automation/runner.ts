@@ -6,6 +6,7 @@ import type {
   AutomationScopeSnapshot,
   CalendarEvent,
   CapabilityRegistry,
+  CapabilityResult,
   NotificationEvent,
   Quote,
   ResearchDiff,
@@ -113,7 +114,7 @@ export async function runAutomation(
 
   for (const raw of symbols) {
     const symbol = raw.trim().toUpperCase()
-    let evaluation: { signals: MaterialSignals; quote: Quote; probeFailed?: boolean } | null
+    let evaluation: { signals: MaterialSignals; quote: Quote; quoteStale: boolean; probeFailed?: boolean } | null
     try {
       evaluation = await evaluateSymbol(symbol, ctx)
     } catch {
@@ -125,7 +126,9 @@ export async function runAutomation(
       continue
     }
     evaluated += 1
-    if (!Number.isFinite(evaluation.signals.priceMovePct)) {
+    if (evaluation.quoteStale) {
+      fail(`${symbol}: quote stale`)
+    } else if (!Number.isFinite(evaluation.signals.priceMovePct)) {
       fail(`${symbol}: previous close unavailable`)
     }
     if (evaluation.probeFailed === true) {
@@ -141,7 +144,7 @@ export async function runAutomation(
         fail(`${symbol}: research analysis failed`, false)
       }
     }
-    if (rule.notify === 'all' || material) {
+    if ((rule.notify === 'all' && !evaluation.quoteStale) || material) {
       try {
         await ctx.notify?.(notificationFor(rule, symbol, material, evaluation.signals, ranAt, ctx.locale))
         notified = true
@@ -257,12 +260,16 @@ function makeScopeSnapshot(
 async function evaluateSymbol(
   symbol: string,
   ctx: AutomationRunContext
-): Promise<{ signals: MaterialSignals; quote: Quote; probeFailed?: boolean } | null> {
-  const quote = await fetchQuote(symbol, ctx)
-  if (quote === null) return null
+): Promise<{ signals: MaterialSignals; quote: Quote; quoteStale: boolean; probeFailed?: boolean } | null> {
+  const fetched = await fetchQuote(symbol, ctx)
+  if (fetched === null) return null
+  const quote = fetched.data
+  const quoteStale = fetched.provenance.stale === true
   const diff = await ctx.diffRepo.getBySymbol(symbol)
   const signals: MaterialSignals = {
-    priceMovePct: priceMovePct(quote),
+    // Provider-declared stale prices cannot prove either a move or no change.
+    // Independent research/calendar signals remain usable; do not invent an age threshold.
+    priceMovePct: quoteStale ? undefined : priceMovePct(quote),
     diffMaterial: diff?.material === true,
     ratingChanged: hasMaterialRatingChange(diff),
     earningsAnnounced: hasNewEarnings(diff),
@@ -275,15 +282,15 @@ async function evaluateSymbol(
       probeFailed = true
     }
   }
-  return { signals, quote, probeFailed }
+  return { signals, quote, quoteStale, probeFailed }
 }
 
-async function fetchQuote(symbol: string, ctx: AutomationRunContext): Promise<Quote | null> {
+async function fetchQuote(symbol: string, ctx: AutomationRunContext): Promise<CapabilityResult<Quote> | null> {
   const cap = ctx.registry.get('market.quote')
   if (!cap) return null
   try {
     const result = await cap.execute({ symbol }, { now: ctx.now })
-    return result.data as Quote
+    return result as CapabilityResult<Quote>
   } catch {
     return null
   }
